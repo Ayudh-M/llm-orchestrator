@@ -1,0 +1,8 @@
+transformers>=4.43.0
+accelerate>=0.30.0
+torch
+tokenizers>=0.15.0
+pydantic>=2.7.0
+orjson>=3.10.0
+python-dotenv>=1.0.1
+rich>=13.7.0
