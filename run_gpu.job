@@ -16,5 +16,12 @@ if [ -f .env ]; then
   set -a; source .env; set +a
 fi
 
+# Arg1: task prompt, Arg2 (optional): roleset name or path
 PROMPT="${1:-Design a JSON schema for a todo app and provide examples.}"
-python -m src.main --prompt "$PROMPT" --models "a=mistralai/Mistral-7B-v0.1 b=mistralai/Mistral-7B-v0.1"
+ROLESET="${2:-}"  # e.g., writer_physicist
+
+if [ -n "$ROLESET" ]; then
+  python -m src.main --prompt "$PROMPT" --roleset "$ROLESET"
+else
+  python -m src.main --prompt "$PROMPT" --models "a=mistralai/Mistral-7B-v0.1 b=mistralai/Mistral-7B-v0.1"
+fi

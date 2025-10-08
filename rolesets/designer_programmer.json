@@ -1,0 +1,14 @@
+{
+  "agents": [
+    {
+      "name": "agent_a",
+      "role": "designer",
+      "model": "mistralai/Mistral-7B-v0.1"
+    },
+    {
+      "name": "agent_b",
+      "role": "programmer",
+      "model": "mistralai/Mistral-7B-v0.1"
+    }
+  ]
+}

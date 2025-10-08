@@ -5,6 +5,7 @@ Two LLM agents collaborate under a strict JSON protocol until they independently
 ## Quick start (local GPU)
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install --upgrade pip
 pip install -r requirements.txt
 python -m src.main --prompt "Design a tiny JSON API and return the schema."
 ```
@@ -15,15 +16,32 @@ python -m src.main --prompt "Design a tiny JSON API and return the schema."
   - Pre-pull with git-lfs: `git lfs install && git clone https://huggingface.co/mistralai/Mistral-7B-v0.1`
   - Or: `hf download mistralai/Mistral-7B-v0.1`
 
+## Role sets (choose agent roles per run)
+Create JSON (or YAML) files under `rolesets/` describing the two agents:
+
+```json
+{
+  "agents": [
+    { "name": "agent_a", "role": "writer",    "model": "mistralai/Mistral-7B-v0.1" },
+    { "name": "agent_b", "role": "physicist", "model": "mistralai/Mistral-7B-v0.1" }
+  ]
+}
+```
+
+### Local run with a roleset
+```bash
+python -m src.main --prompt "Explain cosmic rays to kids" --roleset writer_physicist
+```
+
 ## Snellius (Slurm) quick start (GPU node)
 ```bash
 module load 2024
 python -m venv ~/venvs/llm && source ~/venvs/llm/bin/activate
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 # Submit a short test job (<1h often schedules faster)
-sbatch run_gpu.job "Plan a minimal REST service and return the OpenAPI JSON."
+sbatch run_gpu.job "Explain cosmic rays to kids; return the final text only." writer_physicist
 squeue -u $USER
 ```
 

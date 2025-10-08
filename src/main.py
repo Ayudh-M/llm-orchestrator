@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from rich import print
 from .agents import Agent
 from .controller import run_controller
+from .roleset_loader import load_roleset
 
 def parse_args():
     ap = argparse.ArgumentParser()
@@ -11,6 +12,8 @@ def parse_args():
     ap.add_argument("--models", type=str, default="a=mistralai/Mistral-7B-v0.1 b=mistralai/Mistral-7B-v0.1",
                     help="Space-separated assignments like a=modelA b=modelB [c=modelC]")
     ap.add_argument("--max_rounds", type=int, default=8)
+    ap.add_argument("--roleset", type=str, default=None,
+                    help="Name in rolesets/ (e.g., 'writer_physicist') or a direct path to a roleset file")
     return ap.parse_args()
 
 def parse_models(spec: str):
@@ -24,11 +27,18 @@ def parse_models(spec: str):
 def main():
     load_dotenv(override=False)
     args = parse_args()
-    models = parse_models(args.models)
-    model_a = models.get("a", "mistralai/Mistral-7B-v0.1")
-    model_b = models.get("b", "mistralai/Mistral-7B-v0.1")
-    a = Agent(name="agent_a", role="designer", model_id=model_a)
-    b = Agent(name="agent_b", role="programmer", model_id=model_b)
+
+    if args.roleset:
+        roles = load_roleset(args.roleset)
+        a = Agent(name=roles[0]["name"], role=roles[0]["role"], model_id=roles[0]["model"])
+        b = Agent(name=roles[1]["name"], role=roles[1]["role"], model_id=roles[1]["model"])
+    else:
+        models = parse_models(args.models)
+        model_a = models.get("a", "mistralai/Mistral-7B-v0.1")
+        model_b = models.get("b", "mistralai/Mistral-7B-v0.1")
+        a = Agent(name="agent_a", role="designer", model_id=model_a)
+        b = Agent(name="agent_b", role="programmer", model_id=model_b)
+
     result = run_controller(args.prompt, a, b, max_rounds=args.max_rounds)
     print(json.dumps(result, indent=2))
 
