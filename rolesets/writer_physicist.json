@@ -2,13 +2,17 @@
   "agents": [
     {
       "name": "agent_a",
-      "role": "writer",
-      "model": "mistralai/Mistral-7B-v0.1"
+      "role": "Writer",
+      "domain": "writing",
+      "model": "mistralai/Mistral-7B-v0.1",
+      "pack": "writer"
     },
     {
       "name": "agent_b",
-      "role": "physicist",
-      "model": "mistralai/Mistral-7B-v0.1"
+      "role": "Physicist",
+      "domain": "physics",
+      "model": "mistralai/Mistral-7B-v0.1",
+      "pack": "physicist"
     }
   ]
 }

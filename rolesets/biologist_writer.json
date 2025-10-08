@@ -2,13 +2,17 @@
   "agents": [
     {
       "name": "agent_a",
-      "role": "biologist",
-      "model": "mistralai/Mistral-7B-v0.1"
+      "role": "Biologist",
+      "domain": "biology",
+      "model": "mistralai/Mistral-7B-v0.1",
+      "pack": "biologist"
     },
     {
       "name": "agent_b",
-      "role": "writer",
-      "model": "mistralai/Mistral-7B-v0.1"
+      "role": "Writer",
+      "domain": "writing",
+      "model": "mistralai/Mistral-7B-v0.1",
+      "pack": "writer"
     }
   ]
 }

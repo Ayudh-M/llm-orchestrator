@@ -15,7 +15,7 @@ def load_causal_lm(model_id: str, seed: int = 7):
     )
     return tok, mdl
 
-def generate_json_only(tok, mdl, prompt: str, max_new_tokens: int = 512, temperature: float = 0.7, top_p: float = 0.9) -> str:
+def generate_json_only(tok, mdl, prompt: str, max_new_tokens: int = 768, temperature: float = 0.6, top_p: float = 0.9) -> str:
     inputs = tok(prompt, return_tensors="pt").to(mdl.device)
     with torch.no_grad():
         out = mdl.generate(
