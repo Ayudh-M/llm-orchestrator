@@ -1,0 +1,18 @@
+{
+  "agents": [
+    {
+      "name": "agent_a",
+      "role": "Physicist",
+      "domain": "physics",
+      "model": "mistralai/Mistral-7B-v0.1",
+      "pack": "physicist"
+    },
+    {
+      "name": "agent_b",
+      "role": "Programmer",
+      "domain": "engineering",
+      "model": "mistralai/Mistral-7B-v0.1",
+      "pack": "programmer"
+    }
+  ]
+}

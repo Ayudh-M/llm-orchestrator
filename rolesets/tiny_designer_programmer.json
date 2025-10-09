@@ -1,0 +1,18 @@
+{
+  "agents": [
+    {
+      "name": "agent_a",
+      "role": "UI/UX Designer",
+      "domain": "design",
+      "model": "sshleifer/tiny-gpt2",
+      "pack": "uiux_designer"
+    },
+    {
+      "name": "agent_b",
+      "role": "Programmer",
+      "domain": "engineering",
+      "model": "sshleifer/tiny-gpt2",
+      "pack": "programmer"
+    }
+  ]
+}
