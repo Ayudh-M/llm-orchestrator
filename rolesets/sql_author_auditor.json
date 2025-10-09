@@ -1,0 +1,12 @@
+{
+  "name": "SQL Author \u2194 Auditor",
+  "role_a": {
+    "name": "SQL Author",
+    "instructions": "Produce a single SELECT statement that satisfies constraints."
+  },
+  "role_b": {
+    "name": "SQL Auditor",
+    "instructions": "Check the SQL for correctness, safety, and determinism."
+  },
+  "task_type": "sql"
+}

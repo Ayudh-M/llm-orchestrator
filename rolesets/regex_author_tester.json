@@ -1,0 +1,12 @@
+{
+  "name": "Regex Author \u2194 Tester",
+  "role_a": {
+    "name": "Regex Author",
+    "instructions": "Produce a single regex pattern that matches positives and rejects negatives."
+  },
+  "role_b": {
+    "name": "Regex Tester",
+    "instructions": "Validate the regex against tests and either approve or request changes."
+  },
+  "task_type": "regex"
+}

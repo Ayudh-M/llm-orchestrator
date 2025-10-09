@@ -1,17 +1,20 @@
-from src.schemas import Envelope, Artifact, FinalSolution
+
 from src.controller import run_controller
+from src.agents_mock import RuleBasedMock, EchoPeerMock
 
-class Dummy:
-    def __init__(self, answers):
-        self.answers = answers
-        self.i=0
-    def step(self, task, transcript):
-        env = self.answers[min(self.i, len(self.answers)-1)]
-        self.i += 1
-        return env, str(env)
-
-def test_auto_promote():
-    A = Dummy([{"role":"A","domain":"d","task_understanding":"","public_message":"", "artifact":{"type":"results","content":{}},"needs_from_peer":[],"handoff_to":"", "status":"PROPOSED","final_solution":{"canonical_text":"42"}}])
-    B = Dummy([{"role":"B","domain":"d","task_understanding":"","public_message":"", "artifact":{"type":"results","content":{}},"needs_from_peer":[],"handoff_to":"", "status":"READY_TO_SOLVE","final_solution":{"canonical_text":"42"}}])
-    res = run_controller("t", A, B, max_rounds=1)
+def test_consensus_on_equal_answers():
+    A = RuleBasedMock("42")
+    B = EchoPeerMock("fallback")
+    res = run_controller("task", A, B, max_rounds=3)
     assert res["status"] == "CONSENSUS"
+    assert res["canonical_text"] == "42"
+
+def test_no_consensus_when_different():
+    class OtherMock(RuleBasedMock):
+        def __init__(self): super().__init__("x")
+        def step(self, task, transcript):
+            return {"status":"SOLVED","tag":"[SOLVED]","final_solution":{"canonical_text":"x"}}, "x"
+    A = RuleBasedMock("a")
+    B = OtherMock()
+    res = run_controller("task", A, B, max_rounds=1)
+    assert res["status"] == "NO_CONSENSUS"

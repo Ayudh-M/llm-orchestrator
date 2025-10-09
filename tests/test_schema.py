@@ -1,18 +1,29 @@
-import os, json
+
+import json
 from src.json_enforcer import validate_envelope, coerce_minimal_defaults
+from pathlib import Path
 
-SCHEMA = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schemas", "envelope.schema.json")
+SCHEMA = json.loads((Path("schemas/envelope.schema.json")).read_text())
 
-def test_schema_validate_and_coerce():
-    obj = {"role":"R","domain":"D","status":"SOLVED","final_solution":{"canonical_text":"X","sha256":""},
-           "artifact":{"type":"results","content":{}}, "needs_from_peer":[], "handoff_to":"peer",
-           "task_understanding":"", "public_message":"[SOLVED]"}
+def test_envelope_validation_happy():
+    obj = {
+        "status":"SOLVED",
+        "tag":"[SOLVED]",
+        "final_solution":{"canonical_text":"42"}
+    }
     ok, errs = validate_envelope(obj, SCHEMA)
-    assert ok, f"should be valid: {errs}"
-    # drop a required field, it should be caught
-    bad = obj.copy(); bad.pop("artifact")
-    ok2, errs2 = validate_envelope(bad, SCHEMA)
-    assert not ok2 and errs2
+    assert ok, errs
+
+def test_envelope_missing_solution_rejected():
+    obj = {"status":"SOLVED"}
+    ok, errs = validate_envelope(obj, SCHEMA)
+    assert not ok and errs
+
+def test_coerce_then_validate():
+    bad = {"status":"SOLVED"}
     fixed = coerce_minimal_defaults(bad)
-    ok3, errs3 = validate_envelope(fixed, SCHEMA)
-    assert ok3, f"coerced should validate: {errs3}"
+    ok, errs = validate_envelope(fixed, SCHEMA)
+    assert not ok  # still missing canonical_text
+    fixed["final_solution"]["canonical_text"] = "X"
+    ok2, errs2 = validate_envelope(fixed, SCHEMA)
+    assert ok2

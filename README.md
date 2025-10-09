@@ -56,3 +56,4 @@ The controller halts only when both agents output `status:"SOLVED"`, both includ
 
 
 **Update (protocol hardening):** Controller now requires both canonical text equality *and* SHA-256 of the normalized text to match; envelopes include a `final_solution.sha256` field. JSON-only emission enforced by validator; schema now supports `tags`, `request`, and `meta`.
+\n\n## Quick start (mock)\n\n```bash\npython -m src.main --mock --task "2+2" --answer "4"\n```\n

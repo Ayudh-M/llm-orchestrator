@@ -1,44 +1,38 @@
+
 from __future__ import annotations
-from pydantic import BaseModel, Field
-from typing import Literal, List, Dict, Any, Optional
+from enum import Enum
+from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field, constr, validator
 
-Status = Literal["WORKING", "NEED_PEER", "PROPOSED", "READY_TO_SOLVE", "SOLVED"]
-Tag = Literal["[CONTACT]","[SOLVED]"]
-
-class Artifact(BaseModel):
-    type: Literal["component_spec","code_patch","outline","fact_pack","source_pack","plan","dataset","results"]
-    content: Dict[str, Any] = Field(default_factory=dict)
+class Status(str, Enum):
+    WORKING = "WORKING"
+    NEED_PEER = "NEED_PEER"
+    PROPOSED = "PROPOSED"
+    READY_TO_SOLVE = "READY_TO_SOLVE"
+    SOLVED = "SOLVED"
 
 class FinalSolution(BaseModel):
-    canonical_text: str = ""
-    sha256: str = ""
-
-class Request(BaseModel):
-    to_peer: Optional[str] = None
-
-class Meta(BaseModel):
-    strategy_id: Optional[str] = None
-    roleset_id: Optional[str] = None
-    decoding: Dict[str, Any] = Field(default_factory=dict)
-    guardrails: Dict[str, Any] = Field(default_factory=dict)
+    canonical_text: constr(strip_whitespace=True, min_length=1)
+    sha256: Optional[constr(regex=r"^[0-9a-f]{64}$")] = None
 
 class Envelope(BaseModel):
-    scratch: Dict[str, Any] = Field(default_factory=dict)  # optional CoT, ignored by judges
-    role: str
-    domain: str
-    task_understanding: str
-    public_message: str
-    artifact: Artifact
-    needs_from_peer: List[str] = Field(default_factory=list)
-    handoff_to: str
+    role: Optional[str] = None
+    domain: Optional[str] = None
+    tag: Optional[constr(regex=r"^\[(CONTACT|SOLVED)\]$")] = None
     status: Status
-    final_solution: FinalSolution
-    # New protocol fields (backward-compatible)
-    tags: List[Tag] = Field(default_factory=list)
-    request: Request = Field(default_factory=Request)
-    meta: Meta = Field(default_factory=Meta)
+    content: Optional[Dict[str, Any]] = None
+    final_solution: Optional[FinalSolution] = None
+    artifact: Optional[str] = None
+
+    @validator("final_solution", always=True)
+    def solution_only_on_terminal(cls, v, values):
+        st = values.get("status")
+        if st == Status.SOLVED and v is None:
+            raise ValueError("SOLVED requires final_solution.")
+        if st != Status.SOLVED and v is not None:
+            raise ValueError("final_solution only allowed when SOLVED.")
+        return v
 
     def is_solved(self) -> bool:
-        pm = self.public_message or ""
-        has_tag = ("[SOLVED]" in pm) or ("[SOLVED]" in self.tags)
-        return self.status == "SOLVED" and has_tag and bool((self.final_solution or FinalSolution()).canonical_text)
+        return self.status == Status.SOLVED and self.final_solution is not None
+

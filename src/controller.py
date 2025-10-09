@@ -1,73 +1,72 @@
+
 from __future__ import annotations
-from typing import Dict, Any, List, Tuple
-from .schemas import Envelope
+from typing import Dict, Any, Tuple, Optional, List
+import time, json
+from .schemas import Envelope, Status
 from .canonicalize import canonicalize_for_hash
-from .utils import normalize_text, sha256_hex
+from .utils import to_json, sha256_hex
 
 def _checked(env_dict: Dict[str, Any]) -> Envelope:
     return Envelope.model_validate(env_dict)
 
-
-
-def _canon_and_hash(s: str) -> tuple[str, str]:
+def _canon_and_hash(s: str) -> Tuple[str, str]:
     canon = canonicalize_for_hash(s)
     return canon, sha256_hex(canon)
+
 def _verify_solution(env: Envelope) -> Tuple[bool, str]:
     if not env.is_solved():
-        return False, "not solved or missing [SOLVED] or canonical_text"
+        return False, "not solved or missing final_solution"
+    if not env.final_solution.canonical_text.strip():
+        return False, "empty canonical_text"
     return True, "ok"
 
-def run_controller(task: str, agent_a, agent_b, max_rounds: int = 8) -> Dict[str, Any]:
+def run_controller(task: str, agent_a, agent_b, max_rounds: int = 12, task_type: str = "generic") -> Dict[str, Any]:
+    """agent.step(task, transcript) -> (env_dict, raw_text)"""
     transcript: List[Dict[str, Any]] = []
-    mismatch_count = 0
+    last_from_b: Optional[Envelope] = None
+
     for r in range(1, max_rounds+1):
-        # Agent A
-        a_obj, a_raw = agent_a.step(task, transcript)
-        a_env = _checked(a_obj)
-        \1
-        a_env.final_solution.sha256 = sha256_hex(a_norm) if a_norm else ""
-        transcript.append(a_env.model_dump())
+        # A step
+        env_a_dict, raw_a = agent_a.step(task, transcript)
+        env_a = _checked(env_a_dict)
+        transcript.append({"t": r, "actor": "A", "envelope": env_a.model_dump(), "raw": raw_a})
 
-        # Agent B
-        b_obj, b_raw = agent_b.step(task, transcript)
-        b_env = _checked(b_obj)
-        \1
-        b_env.final_solution.sha256 = sha256_hex(b_norm) if b_norm else ""
-        transcript.append(b_env.model_dump())
+        # B step (peer sees A envelope)
+        env_b_dict, raw_b = agent_b.step(task, transcript)
+        env_b = _checked(env_b_dict)
+        transcript.append({"t": r, "actor": "B", "envelope": env_b.model_dump(), "raw": raw_b})
 
-        # Auto-promotion: if both propose the same candidate
-        statuses = {a_env.status, b_env.status}
-        if a_norm and a_norm == b_norm and statuses.issubset({"PROPOSED","READY_TO_SOLVE"}):
-            a_env.status = "SOLVED"; a_env.tags = list(set((a_env.tags or []) + ["[SOLVED]"]))
-            b_env.status = "SOLVED"; b_env.tags = list(set((b_env.tags or []) + ["[SOLVED]"]))
-            # also update transcript entries
-            transcript[-2] = a_env.model_dump()
-            transcript[-1] = b_env.model_dump()
+        # If both SOLVED, check consensus
+        if env_a.status == Status.SOLVED and env_b.status == Status.SOLVED:
+            ok_a, _ = _verify_solution(env_a)
+            ok_b, _ = _verify_solution(env_b)
+            if not (ok_a and ok_b):
+                continue
+            a_norm, a_hash = _canon_and_hash(env_a.final_solution.canonical_text)
+            b_norm, b_hash = _canon_and_hash(env_b.final_solution.canonical_text)
+            # backfill hashes if missing
+            if env_a.final_solution.sha256 is None:
+                env_a_dict["final_solution"]["sha256"] = a_hash
+            if env_b.final_solution.sha256 is None:
+                env_b_dict["final_solution"]["sha256"] = b_hash
 
-        a_ok, _ = _verify_solution(a_env)
-        b_ok, _ = _verify_solution(b_env)
-        if a_ok and b_ok:
-            if a_norm == b_norm and a_env.final_solution.sha256 == b_env.final_solution.sha256:
+            if a_norm == b_norm and a_hash == b_hash:
                 return {
                     "status": "CONSENSUS",
+                    "canonical_text": a_norm,
+                    "sha256": a_hash,
                     "rounds": r,
-                    "agent_a": a_env.model_dump(),
-                    "agent_b": b_env.model_dump(),
                     "transcript": transcript,
+                    "final_a": env_a_dict,
+                    "final_b": env_b_dict,
                 }
             else:
-                mismatch_count += 1
-                # Arbiter hint (strategy-06 style) after 2 mismatches
-                if mismatch_count >= 2:
-                    transcript.append({
-                        "role": "arbiter",
-                        "domain": "controller",
-                        "public_message": "Your SOLVED answers do not match. Compare canonical_text strings and converge on a single exact output. Keep JSON valid.",
-                        "status": "WORKING"
-                    })
+                # disagreement; continue if rounds left
+                pass
+
     return {
         "status": "NO_CONSENSUS",
+        "reason": "max_rounds_exceeded_or_mismatch",
         "rounds": max_rounds,
         "transcript": transcript,
-        "note": "Max rounds reached without dual SOLVED + identical canonical_text+sha256."
     }

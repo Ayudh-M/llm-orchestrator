@@ -1,50 +1,41 @@
+
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import List, Dict, Any, Tuple
-import hashlib
+from typing import Dict, Any, Tuple
+from .schemas import Status
 
-def _deterministic_answer(task: str) -> str:
-    # If user embeds a forced answer like <<ANSWER:...>>, honor it
-    import re
-    m = re.search(r"<<ANSWER:(.+?)>>", task, flags=re.DOTALL)
-    if m:
-        return m.group(1).strip()
-    # else: stable short token derived from task to guarantee both agents converge
-    h = hashlib.sha256(task.encode("utf-8")).hexdigest()[:16]
-    return f"MOCK_{h}"
+class RuleBasedMock:
+    """A trivial mock that immediately solves with a deterministic answer from task string."""
+    def __init__(self, answer: str):
+        self.answer = answer
 
-@dataclass
-class MockAgent:
-    name: str
-    role: str
-    domain: str
-    peer_role: str
-
-    def step(self, task: str, transcript: List[Dict[str, Any]]) -> Tuple[Dict[str, Any], str]:
-        # Simple 2-turn dance: first turn asks peer, second turn solves with the same canonical_text
-        prior_agent_msgs = [t for t in transcript if t.get("role") == self.role]
-        tag = "[CONTACT]" if len(prior_agent_msgs) == 0 else "[SOLVED]"
-        status = "PROPOSED" if tag == "[CONTACT]" else "SOLVED"
-        canonical = _deterministic_answer(task) if tag == "[SOLVED]" else ""
-
+    def step(self, task: str, transcript):
         env = {
-            "role": self.role,
-            "domain": self.domain,
-            "task_understanding": "mock_run",
-            "public_message": tag,
-            "artifact": {"type":"results","content":{}},
-            "needs_from_peer": [] if tag == "[SOLVED]" else ["peer review"],
-            "handoff_to": self.peer_role,
-            "status": status,
-            "final_solution": {"canonical_text": canonical, "sha256": ""},
-            "tags": [tag],
-            "request": {"to_peer": self.peer_role},
-            "meta": {"generator":"MockAgent","token_estimate":{"prompt":0,"gen":0}},
-            "scratch": {}
+            "status": "SOLVED",
+            "tag": "[SOLVED]",
+            "content": {"note": "mock"},
+            "final_solution": {"canonical_text": self.answer}
         }
-        return env, json_dumps(env)
+        return env, str(env)
 
-def json_dumps(obj: Dict[str, Any]) -> str:
-    # Deterministic JSON string for visibility
-    import json
-    return json.dumps(obj, separators=(',', ':'), ensure_ascii=False)
+class EchoPeerMock:
+    """Solves to the last seen peer SOLVED text if available, else echoes configured answer."""
+    def __init__(self, fallback_answer: str):
+        self.fallback_answer = fallback_answer
+
+    def step(self, task: str, transcript):
+        # find last A envelope if present
+        for item in reversed(transcript):
+            if item.get("actor") == "A":
+                env = item["envelope"]
+                if env.get("status") == "SOLVED" and env.get("final_solution"):
+                    ans = env["final_solution"]["canonical_text"]
+                    break
+        else:
+            ans = self.fallback_answer
+        env = {
+            "status": "SOLVED",
+            "tag": "[SOLVED]",
+            "content": {"note": "echo"},
+            "final_solution": {"canonical_text": ans}
+        }
+        return env, str(env)
