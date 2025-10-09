@@ -1,27 +1,49 @@
-
 #!/bin/bash
-#SBATCH --job-name=consensus
-#SBATCH --time=00:20:00
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --job-name=consensus-mock
+#SBATCH --partition=gpu_h100          # or gpu_a100 (or CPU: rome/genoa)
+#SBATCH --nodes=1
+#SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
+#SBATCH --time=00:10:00
 #SBATCH --mem=24G
 #SBATCH --output=logs/%x-%j.out
 
 set -euo pipefail
 
-# Snellius module stack (example; adjust to your project account)
+# --------- Positional args (like your old flow) ----------
+# $1 = TASK (question/prompt)
+# $2 = STRATEGY label (S1..S10, logged only in mock mode)
+# $3 = AGENT_A (mock_rule|mock_echo)
+# $4 = AGENT_B (mock_rule|mock_echo)
+# $5 = ROLESET path (logged only in mock mode)
+# $6 = ANSWER for mock_rule (optional; default "42")
+TASK="${1:-2+2}"
+STRATEGY="${2:-S1}"
+AGENTA="${3:-mock_rule}"
+AGENTB="${4:-mock_echo}"
+ROLESET="${5:-rolesets/sql_author_auditor.json}"
+ANSWER="${6:-42}"
+# ---------------------------------------------------------
+
 module purge
-# module load 2024
-# module load Python/3.11 CUDA/12.1 cuDNN/8.9
+module load 2024
+# Load the same Python you used when creating the venv:
+module load Python/3.11
 
 # Activate venv
-if [ -d "$HOME/.venvs/consensus" ]; then
-  source "$HOME/.venvs/consensus/bin/activate"
-fi
+source ~/.venvs/consensus/bin/activate
 
-export HF_HOME=${TMPDIR:-/tmp}/hf_cache
-export TRANSFORMERS_OFFLINE=0
+# Caches & output dirs
+export HF_HOME=${HF_HOME:-$SCRATCH/hf_cache}
+mkdir -p "$HF_HOME" runs logs
 
-# For now, we run mock locally — replace with real models on cluster
-python -m src.main --mock --task "2+2" --answer "4" --out runs/${SLURM_JOB_ID}.json
+# MOCK run (controller + diagnostics)
+# Writes runs/<uuid>/{transcript.jsonl,final.json} and appends runs/diagnostics.csv
+srun python -m src.main --mock \
+  --task "$TASK" \
+  --answer "$ANSWER" \
+  --strategy "$STRATEGY" \
+  --roleset "$ROLESET" \
+  --agent-a "$AGENTA" \
+  --agent-b "$AGENTB" \
+  --max-rounds 12
