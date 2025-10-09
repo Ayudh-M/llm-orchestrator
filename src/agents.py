@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Tuple
 import time
 from .model_loader import load_causal_lm, generate_json_only, build_inputs, _render_chat
 from .utils import parse_envelope
+from .json_enforcer import validate_envelope, coerce_minimal_defaults
 from .strategies import REGISTRY as STRATS
 
 @dataclass
@@ -108,4 +109,18 @@ class Agent:
         fs = best_obj.get("final_solution", {}) or {}
         fs.setdefault("sha256","")
         best_obj["final_solution"] = fs
+        # JSON Schema validation (soft enforcement)
+        try:
+            import os
+            schema_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schemas", "envelope.schema.json")
+            ok, errs = validate_envelope(best_obj, schema_path)
+            if not ok:
+                # try minimal coercion, then revalidate once
+                best_obj = coerce_minimal_defaults(best_obj)
+                ok2, errs2 = validate_envelope(best_obj, schema_path)
+                if not ok2:
+                    # attach validation errors to meta for observability
+                    best_obj.setdefault("meta", {}).setdefault("validation_errors", errs2 or errs)
+        except Exception:
+            pass
         return best_obj, best_raw

@@ -1,28 +1,62 @@
 #!/bin/bash
 #SBATCH --job-name=llm-dual
-#SBATCH --time=00:30:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=48G
-#SBATCH --output=logs/%x.%j.out
-#SBATCH --error=logs/%x.%j.err
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --gpus=1
+#SBATCH --partition=gpu
+#SBATCH --time=01:00:00
 
 set -euo pipefail
 
-mkdir -p logs runs
+echo "========== SLURM ENV =========="
+echo "JOB_ID=$SLURM_JOB_ID  JOB_NAME=$SLURM_JOB_NAME"
+echo "NODELIST=$SLURM_NODELIST  NGPUS=$SLURM_GPUS  CPUS=$SLURM_CPUS_PER_TASK"
+echo "SUBMIT_DIR=$SLURM_SUBMIT_DIR"
+echo "Date: $(date)"
+echo "================================"
 
-echo "JOB_ID=$SLURM_JOB_ID"
-echo "HOST=$(hostname)"
-echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
-nvidia-smi || true
+# Load modules (see SURF docs: module sets are versioned; specify exact versions)
+module load 2024
+module load Python/3.12.3-GCCcore-13.3.0
+module load CUDA/12.6.0 || true
 
+# Python venv in $TMPDIR (fast local disk) or fallback to $HOME
+VENVDIR="${TMPDIR:-$HOME}/venv-llm-orch"
+python -V || true
+if [ ! -d "$VENVDIR" ]; then
+  python -m venv "$VENVDIR"
+fi
+source "$VENVDIR/bin/activate"
+python -m pip install --upgrade pip wheel
+
+# Install project deps (cache wheels in $SCRATCH/pip)
+export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$SCRATCH/pip_cache}"
+mkdir -p "$PIP_CACHE_DIR"
+python -m pip install -r requirements.txt
+
+# Hugging Face caches
 export HF_HOME=${HF_HOME:-$SCRATCH/hf_cache}
 export HF_DATASETS_CACHE=${HF_DATASETS_CACHE:-$SCRATCH/hf_datasets}
 export TRANSFORMERS_OFFLINE=0
+mkdir -p "$HF_HOME" "$HF_DATASETS_CACHE"
+
+# Performance knobs
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export TOKENIZERS_PARALLELISM=false
+
+echo "CUDA devices:"
+nvidia-smi || true
 
 PROMPT="$1"
 ROLESET="$2"
 STRATEGY="${3:-strategy-01}"
+MODELS="${4:-a=mistralai/Mistral-7B-Instruct-v0.2 b=mistralai/Mistral-7B-Instruct-v0.2}"
 
-python -m src.main           --prompt "$PROMPT"           --roleset "$ROLESET"           --strategy "$STRATEGY"           --models "a=mistralai/Mistral-7B-Instruct-v0.2 b=mistralai/Mistral-7B-Instruct-v0.2"           --max_rounds 8
+set -x
+python -m src.main   --prompt "$PROMPT"   --roleset "$ROLESET"   --strategy "$STRATEGY"   --models "$MODELS"   --max_rounds 8   --runs_file runs/results.jsonl
+set +x
+
+echo "Finished at $(date)"

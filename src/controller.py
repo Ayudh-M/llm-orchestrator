@@ -1,11 +1,17 @@
 from __future__ import annotations
 from typing import Dict, Any, List, Tuple
 from .schemas import Envelope
+from .canonicalize import canonicalize_for_hash
 from .utils import normalize_text, sha256_hex
 
 def _checked(env_dict: Dict[str, Any]) -> Envelope:
     return Envelope.model_validate(env_dict)
 
+
+
+def _canon_and_hash(s: str) -> tuple[str, str]:
+    canon = canonicalize_for_hash(s)
+    return canon, sha256_hex(canon)
 def _verify_solution(env: Envelope) -> Tuple[bool, str]:
     if not env.is_solved():
         return False, "not solved or missing [SOLVED] or canonical_text"
@@ -18,14 +24,14 @@ def run_controller(task: str, agent_a, agent_b, max_rounds: int = 8) -> Dict[str
         # Agent A
         a_obj, a_raw = agent_a.step(task, transcript)
         a_env = _checked(a_obj)
-        a_norm = normalize_text(a_env.final_solution.canonical_text or "")
+        \1
         a_env.final_solution.sha256 = sha256_hex(a_norm) if a_norm else ""
         transcript.append(a_env.model_dump())
 
         # Agent B
         b_obj, b_raw = agent_b.step(task, transcript)
         b_env = _checked(b_obj)
-        b_norm = normalize_text(b_env.final_solution.canonical_text or "")
+        \1
         b_env.final_solution.sha256 = sha256_hex(b_norm) if b_norm else ""
         transcript.append(b_env.model_dump())
 
