@@ -53,3 +53,6 @@ Agents **must** emit exactly one JSON object per turn:
 }
 ```
 The controller halts only when both agents output `status:"SOLVED"`, both include `[SOLVED]`, and both have **identical** `final_solution.canonical_text`.
+
+
+**Update (protocol hardening):** Controller now requires both canonical text equality *and* SHA-256 of the normalized text to match; envelopes include a `final_solution.sha256` field. JSON-only emission enforced by validator; schema now supports `tags`, `request`, and `meta`.

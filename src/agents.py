@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from .model_loader import load_causal_lm, generate_json_only
 from .utils import parse_envelope
 
@@ -15,28 +15,15 @@ class Agent:
     max_new_tokens: int = 768
 
     def __post_init__(self):
-        self.tok, self.mdl = load_causal_lm(self.model_id, seed=self.seed)
+        self.tok, self.model = load_causal_lm(self.model_id, seed=self.seed)
 
-    def build_prompt(self, task: str, transcript: List[Dict[str, Any]]):
-        tlines = [
-            self.system_prompt,
-            f"\nYour identity: {self.name} — role: {self.role} — domain: {self.domain}.",
-            "\nTask (one line):",
-            task.strip(),
-            "\nTranscript so far (peer's last public envelopes, newest last):",
-        ]
-        for e in transcript[-10:]:
-            tlines.append(f"- {e.get('role','peer')}: {e.get('public_message','')} status={e.get('status','')}")
-        tlines.append("\nReturn ONLY the JSON object described in the protocol.\n")
-        return "\n".join(tlines)
-
-    def step(self, task: str, transcript: List[Dict[str, Any]]):
-        prompt = self.build_prompt(task, transcript)
-        raw = generate_json_only(self.tok, self.mdl, prompt, max_new_tokens=self.max_new_tokens)
+    def step(self, task: str, transcript: List[Dict[str, Any]]) -> Tuple[Dict[str,Any], str]:
+        user_prompt = task
+        raw = generate_json_only(self.tok, self.model, self.system_prompt, user_prompt, max_new_tokens=self.max_new_tokens)
         obj, err = parse_envelope(raw)
-        if err or not isinstance(obj, dict):
-            # fallback minimal envelope
-            return {
+        if obj is None:
+            # Structured fallback envelope
+            fb = {
                 "role": self.role,
                 "domain": self.domain,
                 "task_understanding": "Parse error; requesting clarification.",
@@ -45,8 +32,20 @@ class Agent:
                 "needs_from_peer": ["Re-send last artifact in simpler structure"],
                 "handoff_to": "peer",
                 "status": "NEED_PEER",
-                "final_solution": {"canonical_text": ""}
-            }, raw
+                "tags": ["[CONTACT]"],
+                "request": {"to_peer": "Please restate your last message as valid JSON matching the agreed envelope."},
+                "meta": {"strategy_id":"strategy-01"},
+                "final_solution": {"canonical_text": "", "sha256": ""}
+            }
+            return fb, raw
         obj.setdefault("role", self.role)
         obj.setdefault("domain", self.domain)
+        # Ensure new protocol keys exist
+        obj.setdefault("tags", [])
+        obj.setdefault("request", {"to_peer": None})
+        obj.setdefault("meta", {"strategy_id":"strategy-01"})
+        # Ensure final_solution.sha256 exists
+        fs = obj.get("final_solution", {}) or {}
+        fs.setdefault("sha256", "")
+        obj["final_solution"] = fs
         return obj, raw
