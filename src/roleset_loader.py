@@ -10,7 +10,8 @@ except Exception:
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ROLESETS_DIR = os.path.join(REPO_ROOT, "rolesets")
 PACKS_DIR = os.path.join(ROLESETS_DIR, "packs")
-GLOBAL_PATH = os.path.join(ROLESETS_DIR, "_GLOBAL_PROTOCOL.md")
+STRATEGIES_DIR = os.path.join(REPO_ROOT, "strategies")
+DEFAULT_STRATEGY = "strategy-01.md"
 
 def _read(p: str) -> str:
     with open(p, "r", encoding="utf-8") as f:
@@ -25,15 +26,23 @@ def _load_struct(path: str) -> dict:
         return yaml.safe_load(txt)
     return json.loads(txt)
 
-def _assemble_system_prompt(pack: str | None) -> str:
-    base = _read(GLOBAL_PATH)
+def _assemble_system_prompt(pack: str | None, strategy_name: str | None) -> str:
+    # Strategy text comes first; pack text appended.
+    if strategy_name:
+        s_path = os.path.join(STRATEGIES_DIR, strategy_name if strategy_name.endswith(".md") else f"{strategy_name}.md")
+        if not os.path.exists(s_path):
+            raise FileNotFoundError(f"Strategy '{strategy_name}' not found under strategies/")
+    else:
+        s_path = os.path.join(STRATEGIES_DIR, DEFAULT_STRATEGY)
+    base = _read(s_path)
+
     if pack:
         pack_path = os.path.join(PACKS_DIR, f"{pack}.md")
         if os.path.exists(pack_path):
             base += "\n\n" + _read(pack_path)
     return base
 
-def load_roleset(name_or_path: str) -> List[Dict[str, str]]:
+def load_roleset(name_or_path: str, strategy_name: str | None = None) -> List[Dict[str, str]]:
     # Resolve JSON/YAML
     if os.path.exists(name_or_path):
         data = _load_struct(name_or_path)
@@ -56,7 +65,7 @@ def load_roleset(name_or_path: str) -> List[Dict[str, str]]:
         domain = a.get("domain", role)
         model = a.get("model")
         pack = a.get("pack")  # optional string referencing packs/*.md
-        system_prompt = _assemble_system_prompt(pack)
+        system_prompt = _assemble_system_prompt(pack, strategy_name)
         if not all([name, role, model]):
             raise ValueError("Each agent must include name, role, model")
         out.append({
