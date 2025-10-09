@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentTurnEnvelope",
+  "type": "object",
+  "required": [
+    "role",
+    "domain",
+    "task_understanding",
+    "public_message",
+    "artifact",
+    "needs_from_peer",
+    "handoff_to",
+    "status",
+    "final_solution"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "role": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "task_understanding": {
+      "type": "string"
+    },
+    "public_message": {
+      "type": "string"
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "content": {
+          "type": "object"
+        }
+      }
+    },
+    "needs_from_peer": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "handoff_to": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "WORKING",
+        "NEED_PEER",
+        "PROPOSED",
+        "READY_TO_SOLVE",
+        "SOLVED"
+      ]
+    },
+    "final_solution": {
+      "type": "object",
+      "required": [
+        "canonical_text",
+        "sha256"
+      ],
+      "properties": {
+        "canonical_text": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "[CONTACT]",
+          "[SOLVED]"
+        ]
+      }
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "to_peer": {
+          "type": "string"
+        }
+      }
+    },
+    "meta": {
+      "type": "object"
+    },
+    "scratch": {
+      "type": "object"
+    }
+  }
+}

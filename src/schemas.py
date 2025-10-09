@@ -23,6 +23,7 @@ class Meta(BaseModel):
     guardrails: Dict[str, Any] = Field(default_factory=dict)
 
 class Envelope(BaseModel):
+    scratch: Dict[str, Any] = Field(default_factory=dict)  # optional CoT, ignored by judges
     role: str
     domain: str
     task_understanding: str
