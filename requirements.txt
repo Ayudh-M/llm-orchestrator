@@ -1,1 +1,8 @@
-pydantic>=2.5.0\njsonschema>=4.21.0\nrich>=13.7.0\nPyYAML>=6.0.1\ntransformers>=4.43.0\ntokenizers>=0.15.0\naccelerate>=0.30.0\ntorch\n
+﻿pydantic>=2.5.0
+jsonschema>=4.21.0
+rich>=13.7.0
+PyYAML>=6.0.1
+transformers>=4.43.0
+tokenizers>=0.15.0
+accelerate>=0.30.0
+torch

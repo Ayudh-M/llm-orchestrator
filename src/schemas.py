@@ -2,7 +2,7 @@
 from __future__ import annotations
 from enum import Enum
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, constr, validator
+from pydantic import BaseModel, Field, constr, field_validator, model_validator
 
 class Status(str, Enum):
     WORKING = "WORKING"
@@ -13,26 +13,24 @@ class Status(str, Enum):
 
 class FinalSolution(BaseModel):
     canonical_text: constr(strip_whitespace=True, min_length=1)
-    sha256: Optional[constr(regex=r"^[0-9a-f]{64}$")] = None
+    sha256: Optional[constr(pattern=r"^[0-9a-f]{64}$")] = None
 
 class Envelope(BaseModel):
     role: Optional[str] = None
     domain: Optional[str] = None
-    tag: Optional[constr(regex=r"^\[(CONTACT|SOLVED)\]$")] = None
+    tag: Optional[constr(pattern=r"^\[(CONTACT|SOLVED)\]$")] = None
     status: Status
     content: Optional[Dict[str, Any]] = None
     final_solution: Optional[FinalSolution] = None
     artifact: Optional[str] = None
 
-    @validator("final_solution", always=True)
-    def solution_only_on_terminal(cls, v, values):
-        st = values.get("status")
-        if st == Status.SOLVED and v is None:
+    @model_validator(mode="after")
+    def _solution_only_on_terminal(self):
+        if self.status == Status.SOLVED and self.final_solution is None:
             raise ValueError("SOLVED requires final_solution.")
-        if st != Status.SOLVED and v is not None:
+        if self.status != Status.SOLVED and self.final_solution is not None:
             raise ValueError("final_solution only allowed when SOLVED.")
-        return v
+        return self
 
     def is_solved(self) -> bool:
         return self.status == Status.SOLVED and self.final_solution is not None
-
