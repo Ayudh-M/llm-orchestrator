@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=consensus-hf
 #SBATCH --partition=gpu
-#SBATCH --nodes=1
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=01:00:00
@@ -10,38 +9,35 @@
 
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
+mkdir -p logs runs
 
-SCENARIO="${1:?scenario id required}"
+SCENARIO="${1:?usage: sbatch run_gpu_hf.job <scenario_id> [model_a] [model_b] [dtype]}"
 MODEL_A="${2:-}"
 MODEL_B="${3:-}"
 DTYPE="${4:-bfloat16}"
 
-echo "== Snellius job: scenario=$SCENARIO model_a=${MODEL_A:-'(default)'} model_b=${MODEL_B:-'(default)'} dtype=$DTYPE"
+module purge
+module load 2024
+module load Python/3.12.3-GCCcore-13.3.0
 
-# Prefer node-local scratch if available; otherwise fallback to shared scratch
-if [ -n "${TMPDIR:-}" ]; then
-  export HF_HOME="$TMPDIR/hf"
-  export TRANSFORMERS_CACHE="$HF_HOME/transformers"
-  export HF_DATASETS_CACHE="$HF_HOME/datasets"
+if [ -f "$HOME/.venvs/consensus312/bin/activate" ]; then
+  source "$HOME/.venvs/consensus312/bin/activate"
 else
-  export HF_HOME="/scratch-shared/$USER/hf"
-  export TRANSFORMERS_CACHE="$HF_HOME/transformers"
-  export HF_DATASETS_CACHE="$HF_HOME/datasets"
-fi
-mkdir -p "$HF_HOME" "$TRANSFORMERS_CACHE" "$HF_DATASETS_CACHE"
-
-# Python env: use existing venv if present; else create a throwaway venv in scratch
-if [ -f "$HOME/.venvs/consensus/bin/activate" ]; then
-  source "$HOME/.venvs/consensus/bin/activate"
-else
-  VENV_DIR="${TMPDIR:-/scratch-shared/$USER}/venvs/consensus"
-  python3 -m venv "$VENV_DIR"
-  source "$VENV_DIR/bin/activate"
-  python -m pip install --upgrade pip
+  python3 -m venv "$HOME/.venvs/consensus312"
+  source "$HOME/.venvs/consensus312/bin/activate"
+  python -m pip install -U pip
   pip install -r requirements.txt
 fi
 
-mkdir -p logs runs
-export PYTHONPATH="$PWD:$PWD/src:$PYTHONPATH"
+export HF_HOME="${TMPDIR:-/scratch-shared/$USER}/hf"
+export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+export HF_DATASETS_CACHE="$HF_HOME/datasets"
 
-srun python -m src.main \  --scenario "$SCENARIO" \  ${MODEL_A:+--model-a "$MODEL_A"} \  ${MODEL_B:+--model-b "$MODEL_B"} \  --dtype "$DTYPE"
+export PYTHONPATH="$PWD:$PWD/src:${PYTHONPATH:-}"
+
+ARGS=( -m src.main --scenario "$SCENARIO" --dtype "$DTYPE" )
+[ -n "$MODEL_A" ] && ARGS+=( --model-a "$MODEL_A" )
+[ -n "$MODEL_B" ] && ARGS+=( --model-b "$MODEL_B" )
+
+echo "Running: python ${ARGS[*]}"
+srun python "${ARGS[@]}"

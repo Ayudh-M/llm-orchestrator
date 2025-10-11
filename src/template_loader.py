@@ -1,6 +1,5 @@
-
 from __future__ import annotations
-import json, yaml
+import yaml, json
 from pathlib import Path
 from typing import Any, Dict
 
@@ -9,8 +8,8 @@ REGISTRY = ROOT / "prompts" / "registry.yaml"
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data or {}
+        data = yaml.safe_load(f) or {}
+    return data
 
 def load_registry() -> Dict[str, Any]:
     if not REGISTRY.exists():
@@ -28,14 +27,16 @@ def load_strategy(name: str) -> Dict[str, Any]:
 
 def load_roleset(path_str: str) -> Dict[str, Any]:
     path = (ROOT / path_str).resolve()
-    text = path.read_text(encoding="utf-8")
-    if path.suffix.lower() in {".yaml", ".yml"}:
-        return yaml.safe_load(text)
-    return json.loads(text)
+    if not path.exists():
+        raise FileNotFoundError(f"Roleset not found: {path}")
+    with path.open("r", encoding="utf-8") as f:
+        if path.suffix.lower() == ".json":
+            return json.load(f)
+        return yaml.safe_load(f)
 
-def get_scenario(sid: str) -> Dict[str, Any]:
+def get_scenario(scenario_id: str) -> Dict[str, Any]:
     reg = load_registry()
     try:
-        return reg["scenarios"][sid]
-    except KeyError as e:
-        raise KeyError(f"Scenario '{sid}' not found in {REGISTRY}") from e
+        return reg["scenarios"][scenario_id]
+    except KeyError:
+        raise KeyError(f"Scenario id not found in registry: {scenario_id}")

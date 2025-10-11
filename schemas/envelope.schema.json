@@ -1,87 +1,26 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["tag","status"],
   "properties": {
-    "role": {
-      "type": "string"
-    },
-    "domain": {
-      "type": "string"
-    },
-    "tag": {
-      "type": "string",
-      "pattern": "^\\[(CONTACT|SOLVED)\\]$"
-    },
-    "status": {
-      "type": "string",
-      "enum": [
-        "WORKING",
-        "NEED_PEER",
-        "PROPOSED",
-        "READY_TO_SOLVE",
-        "SOLVED"
-      ]
-    },
-    "content": {
-      "type": "object"
-    },
+    "tag": { "type":"string", "pattern":"^\[(CONTACT|SOLVED)\]$" },
+    "status": { "type":"string", "enum":["WORKING","NEED_PEER","PROPOSED","READY_TO_SOLVE","SOLVED"] },
+    "content": { "type":"object" },
     "final_solution": {
-      "type": "object",
+      "type":"object",
+      "required":["canonical_text"],
       "properties": {
-        "canonical_text": {
-          "type": "string",
-          "minLength": 1
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        }
+        "canonical_text": { "type":"string", "minLength":1 },
+        "sha256": { "type":"string", "pattern":"^[0-9a-f]{64}$" }
       },
-      "required": [
-        "canonical_text"
-      ],
       "additionalProperties": false
-    },
-    "artifact": {
-      "type": "string"
     }
   },
-  "required": [
-    "status"
-  ],
-  "additionalProperties": true,
   "allOf": [
-    {
-      "if": {
-        "properties": {
-          "status": {
-            "const": "SOLVED"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "final_solution"
-        ]
-      }
-    },
-    {
-      "if": {
-        "not": {
-          "properties": {
-            "status": {
-              "const": "SOLVED"
-            }
-          }
-        }
-      },
-      "then": {
-        "not": {
-          "required": [
-            "final_solution"
-          ]
-        }
-      }
-    }
-  ]
+    { "if": { "properties": { "status": { "const":"SOLVED" } } },
+      "then": { "required": ["final_solution"] } },
+    { "if": { "properties": { "status": { "not": { "const":"SOLVED" } } } },
+      "then": { "not": { "required": ["final_solution"] } } }
+  ],
+  "additionalProperties": true
 }

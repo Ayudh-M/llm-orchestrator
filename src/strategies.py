@@ -1,27 +1,20 @@
-
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Optional, Dict, Any
 
 @dataclass
 class Strategy:
     name: str
     json_only: bool = True
     allow_cot: bool = False
-    use_grammar: bool = False
-    decoding: Dict[str, Any] = None
-    max_turns: int = 12
-    short_utterances: bool = True
+    max_rounds: int = 8
+    decoding: Optional[Dict[str, Any]] = None
 
-REGISTRY = {
-    "S1": Strategy("S1", json_only=True, allow_cot=False, decoding={"temperature":0.0}),
-    "S2": Strategy("S2", json_only=True, allow_cot=True, decoding={"temperature":0.3}),
-    "S3": Strategy("S3", json_only=True, allow_cot=False, decoding={"temperature":0.0}),
-    "S4": Strategy("S4", json_only=True, allow_cot=True, decoding={"temperature":0.2}),
-    "S5": Strategy("S5"),
-    "S6": Strategy("S6"),
-    "S7": Strategy("S7"),
-    "S8": Strategy("S8"),
-    "S9": Strategy("S9"),
-    "S10": Strategy("S10"),
-}
+def build_strategy(cfg: Dict[str, Any]) -> Strategy:
+    return Strategy(
+        name=cfg.get("id") or cfg.get("name", "S1"),
+        json_only=True if cfg.get("json_envelope_schema") else cfg.get("json_only", True),
+        allow_cot=cfg.get("allow_cot", False),
+        max_rounds=cfg.get("max_rounds", 8),
+        decoding=cfg.get("decoding") or {"do_sample": False, "temperature": 0.0, "max_new_tokens": 256},
+    )

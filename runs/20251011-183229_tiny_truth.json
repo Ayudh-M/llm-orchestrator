@@ -1,0 +1,54 @@
+{
+  "status": "CONSENSUS",
+  "rounds": 2,
+  "canonical_text": "TRUE",
+  "sha256": "dfe88090c5ed7ac2f32571f0fc822fda4d8cd281fc7138c7cd6db656f6e2d081",
+  "transcript": [
+    {
+      "round": 1,
+      "a": {
+        "envelope": {
+          "tag": "[CONTACT]",
+          "status": "PROPOSED",
+          "content": {
+            "proposal": "TRUE"
+          }
+        },
+        "raw": "{'tag': '[CONTACT]', 'status': 'PROPOSED', 'content': {'proposal': 'TRUE'}}"
+      },
+      "b": {
+        "envelope": {
+          "tag": "[CONTACT]",
+          "status": "PROPOSED",
+          "content": {
+            "proposal": "TRUE"
+          }
+        },
+        "raw": "{'tag': '[CONTACT]', 'status': 'PROPOSED', 'content': {'proposal': 'TRUE'}}"
+      }
+    },
+    {
+      "round": 2,
+      "a": {
+        "envelope": {
+          "tag": "[SOLVED]",
+          "status": "SOLVED",
+          "final_solution": {
+            "canonical_text": "TRUE"
+          }
+        },
+        "raw": "{'tag': '[SOLVED]', 'status': 'SOLVED', 'final_solution': {'canonical_text': 'TRUE'}}"
+      },
+      "b": {
+        "envelope": {
+          "tag": "[SOLVED]",
+          "status": "SOLVED",
+          "final_solution": {
+            "canonical_text": "TRUE"
+          }
+        },
+        "raw": "{'tag': '[SOLVED]', 'status': 'SOLVED', 'final_solution': {'canonical_text': 'TRUE'}}"
+      }
+    }
+  ]
+}

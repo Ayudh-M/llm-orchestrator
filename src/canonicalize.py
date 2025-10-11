@@ -1,25 +1,26 @@
-
 from __future__ import annotations
 import json, re
+from decimal import Decimal
+import sqlparse
 
-def _collapse_ws(s: str) -> str:
-    return " ".join(s.strip().split())
-
-def canonicalize_for_hash(text: str) -> str:
-    # Try JSON minify & sort
-    t = text.strip()
-    try:
-        obj = json.loads(t)
-        return json.dumps(obj, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
-    except Exception:
-        pass
-
-    # Try heuristic SQL normalization: strip comments and collapse WS
-    # Remove /* */ and -- comments (but keep quoted strings intact)
-    s = t
-    # remove /* ... */ blocks
-    s = re.sub(r"/\*.*?\*/", " ", s, flags=re.DOTALL)
-    # remove -- to end-of-line
-    s = re.sub(r"--.*?$", " ", s, flags=re.MULTILINE)
-    s = _collapse_ws(s)
-    return s
+def canonicalize_for_hash(text: str, kind: str | None = None) -> str:
+    s = text.strip()
+    if kind == "json":
+        try:
+            return json.dumps(json.loads(s), separators=(",", ":"), ensure_ascii=False)
+        except Exception:
+            pass
+    if kind == "regex":
+        return re.sub(r"\s+", "", s)
+    if kind == "sql":
+        try:
+            return " ".join(sqlparse.format(s, keyword_case="upper", strip_comments=True).split())
+        except Exception:
+            return " ".join(s.split())
+    if kind == "number":
+        try:
+            return str(Decimal(s).normalize())
+        except Exception:
+            return s
+    # default: collapse whitespace
+    return " ".join(s.split())

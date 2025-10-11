@@ -1,124 +1,159 @@
-
 from __future__ import annotations
-import argparse, json, time
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, List
 
-from template_loader import get_scenario, load_roleset, load_strategy
-from agent import HFChatAgent
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, Optional, List
+
+# --- Package-safe imports: work when invoked as `python -m src.main`
+try:
+    from .template_loader import get_scenario, load_roleset, load_strategy
+    from .strategies import build_strategy
+    from .model_loader import load_model_and_tokenizer
+    from .agents_hf import HFChatAgent
+    from .agents_mock import MockAgent
+    from .controller import run_controller
+except ImportError:
+    # Fallback if someone runs `python src/main.py` by mistake
+    from template_loader import get_scenario, load_roleset, load_strategy  # type: ignore
+    from strategies import build_strategy  # type: ignore
+    from model_loader import load_model_and_tokenizer  # type: ignore
+    from agents_hf import HFChatAgent  # type: ignore
+    from agents_mock import MockAgent  # type: ignore
+    from controller import run_controller  # type: ignore
+
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
-RUNS.mkdir(exist_ok=True)
+RUNS.mkdir(parents=True, exist_ok=True)
+
 
 def _now_stamp() -> str:
     return time.strftime("%Y%m%d-%H%M%S")
 
-def _pick_roles(roleset: Dict[str, Any]):
-    roleA = (roleset.get("A") or {}).get("system")
-    roleB = (roleset.get("B") or {}).get("system")
-    if not roleA or not roleB:
-        raise ValueError("Roleset must contain keys 'A' and 'B' with 'system' prompts.")
-    return roleA, roleB
 
-def build_agents(roleset: Dict[str, Any], model_a: str, model_b: str, dtype: str):
-    roleA, roleB = _pick_roles(roleset)
-    A = HFChatAgent(system_prompt=roleA, model_id=model_a, dtype=dtype)
-    B = HFChatAgent(system_prompt=roleB, model_id=model_b, dtype=dtype)
-    return A, B
+def _dump_json(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, indent=2)
 
-def run_contact_strategy(task_text: str, schema_hint: Optional[str],
-                         roleset: Dict[str, Any], model_a: str, model_b: str, dtype: str,
-                         strategy: Dict[str, Any], max_rounds: int, stop_when: List[str],
-                         out_prefix: str) -> Dict[str, Any]:
 
-    A, B = build_agents(roleset, model_a, model_b, dtype)
+def _pick(
+    scenario: Dict[str, Any], key: str, fallback_block: str | None = None, subkey: str | None = None
+) -> Optional[str]:
+    """
+    Helper to pick values from scenario:
+      - direct key (e.g., "model_a")
+      - or from a nested block (e.g., "models": {"a": "...", "b": "..."})
+    """
+    if key in scenario and scenario[key]:
+        return scenario[key]
+    if fallback_block and subkey:
+        block = scenario.get(fallback_block) or {}
+        if isinstance(block, dict) and subkey in block:
+            return block[subkey]
+    return None
 
-    transcript = []
-    env_a = {"tag": "[CONTACT]", "status": "WORKING", "content": {"note": "start"}}
-    env_b = {"tag": "[CONTACT]", "status": "WORKING", "content": {"note": "start"}}
 
-    def is_stop(env: Dict[str, Any]) -> bool:
-        if env.get("status") in stop_when:
-            return True
-        fs = env.get("final_solution") or {}
-        return bool(fs.get("canonical_text"))
-
-    for r in range(1, max_rounds + 1):
-        env_a = A.step(task_text, env_b, schema_hint)
-        transcript.append({"t": r, "actor": "A", "envelope": env_a})
-        if is_stop(env_a):
-            break
-
-        env_b = B.step(task_text, env_a, schema_hint)
-        transcript.append({"t": r, "actor": "B", "envelope": env_b})
-        if is_stop(env_b):
-            break
-
-    def extract_text(env: Dict[str, Any]) -> Optional[str]:
-        return (env.get("final_solution") or {}).get("canonical_text") \
-            or (env.get("content") or {}).get("canonical_text") \
-            or (env.get("content") or {}).get("text")
-
-    winner = env_a if is_stop(env_a) else (env_b if is_stop(env_b) else None)
-    status = "SOLVED" if winner else "NO_CONSENSUS"
-    canonical = extract_text(winner) if winner else None
-
-    out = {
-        "status": status,
-        "rounds": len(transcript),
-        "transcript": transcript
-    }
-    (RUNS / f"{out_prefix}.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    return out
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--scenario", type=str, help="Scenario id from prompts/registry.yaml")
-    ap.add_argument("--task", type=str, help="Legacy task text")
-    ap.add_argument("--roleset", type=str, help="Legacy roleset path")
-    ap.add_argument("--strategy", type=str, default="S1")
-    ap.add_argument("--model-a", type=str)
-    ap.add_argument("--model-b", type=str)
-    ap.add_argument("--dtype", type=str, default="bfloat16")
-    ap.add_argument("--schema-hint", type=str)
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Two-agent consensus runner")
+    ap.add_argument("--scenario", required=True, help="Scenario id from prompts/registry.yaml")
+    ap.add_argument("--mock", action="store_true", help="Use deterministic mock agents (no models needed)")
+    ap.add_argument("--model-a", dest="model_a", default=None, help="Override model A repo-id")
+    ap.add_argument("--model-b", dest="model_b", default=None, help="Override model B repo-id")
+    ap.add_argument("--dtype", default=None, help="Model dtype: bf16|fp16|fp32 (defaults come from scenario)")
     args = ap.parse_args()
 
-    if args.scenario:
-        sc = get_scenario(args.scenario)
-        task_text   = sc["task_text"]
-        roleset     = load_roleset(sc["roleset"])
-        strategy    = load_strategy(sc.get("strategy", "S1"))
-        schema_hint = sc.get("schema_hint")
-        model_a     = args.model_a or sc["models"]["a"]
-        model_b     = args.model_b or sc["models"]["b"]
-        dtype       = args.dtype or sc.get("dtype", "bfloat16")
-        max_rounds  = sc.get("max_rounds", strategy.get("max_rounds", 8))
-        stop_when   = sc.get("stop_when", strategy.get("stop_when", ["SOLVED"]))
-        out_prefix  = f"{_now_stamp()}_{args.scenario}"
+    # 1) Load scenario + strategy
+    try:
+        scenario = get_scenario(args.scenario)
+    except Exception as e:
+        print(f"[error] Could not load scenario '{args.scenario}': {e}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        strat_cfg = load_strategy(scenario["strategy"])
+    except KeyError:
+        print("[error] Scenario is missing the 'strategy' field.", file=sys.stderr)
+        sys.exit(2)
+    strategy = build_strategy(strat_cfg)
+
+    task_text: str = scenario.get("task", "")
+    if not isinstance(task_text, str) or not task_text.strip():
+        print("[error] Scenario 'task' is empty.", file=sys.stderr)
+        sys.exit(2)
+
+    kind: Optional[str] = scenario.get("kind")
+
+    # 2) Run path selection
+    if args.mock:
+        # Pure local smoke test: no rolesets/models required
+        mock_solution = scenario.get("mock_solution", "TRUE")
+        agent_a = MockAgent("A", solution_text=mock_solution)
+        agent_b = MockAgent("B", solution_text=mock_solution)
+        result = run_controller(task_text, agent_a, agent_b, max_rounds=strategy.max_rounds, kind=kind)
+
     else:
-        if not args.task or not args.roleset:
-            raise SystemExit("Provide --scenario OR (--task AND --roleset).")
-        task_text   = args.task
-        roleset     = load_roleset(args.roleset)
-        strategy    = load_strategy(args.strategy)
-        schema_hint = args.schema_hint
-        model_a     = args.model_a or "mistralai/Mistral-7B-Instruct-v0.2"
-        model_b     = args.model_b or "mistralai/Mistral-7B-Instruct-v0.2"
-        dtype       = args.dtype
-        max_rounds  = strategy.get("max_rounds", 8)
-        stop_when   = strategy.get("stop_when", ["SOLVED"])
-        out_prefix  = f"{_now_stamp()}_legacy"
+        # Real models path: load roleset + models
+        roleset_path = scenario.get("roleset")
+        if not roleset_path:
+            print("[error] Scenario is missing 'roleset' for non-mock runs.", file=sys.stderr)
+            sys.exit(2)
 
-    out = run_contact_strategy(task_text, schema_hint, roleset, model_a, model_b,
-                               dtype, strategy, max_rounds, stop_when, out_prefix)
+        try:
+            roleset = load_roleset(roleset_path)
+        except Exception as e:
+            print(f"[error] Could not load roleset '{roleset_path}': {e}", file=sys.stderr)
+            sys.exit(2)
 
-    final_env = out.get("transcript", [])[-1]["envelope"] if out.get("transcript") else {}
-    txt = (final_env.get("final_solution", {}) or {}).get("canonical_text") \
-          or (final_env.get("content", {}) or {}).get("canonical_text") \
-          or (final_env.get("content", {}) or {}).get("text") \
-          or ""
-    print("\\n=== FINAL TEXT ===\\n" + txt)
+        # Model selections
+        model_a = args.model_a or _pick(scenario, "model_a", fallback_block="models", subkey="a")
+        model_b = args.model_b or _pick(scenario, "model_b", fallback_block="models", subkey="b")
+        if not model_a or not model_b:
+            print("[error] Missing model ids (model_a/model_b or models:{a,b}) in scenario and no CLI override.", file=sys.stderr)
+            sys.exit(2)
+
+        dtype = args.dtype or scenario.get("dtype")
+
+        # Load models
+        try:
+            tok_a, mdl_a = load_model_and_tokenizer(model_a, dtype=dtype)
+            tok_b, mdl_b = load_model_and_tokenizer(model_b, dtype=dtype)
+        except Exception as e:
+            print(f"[error] Failed to load models/tokenizers: {e}", file=sys.stderr)
+            sys.exit(3)
+
+        # Build agents
+        try:
+            sys_a = roleset["agent_a"]["system"]
+            sys_b = roleset["agent_b"]["system"]
+        except KeyError:
+            print("[error] Roleset must have agent_a.system and agent_b.system", file=sys.stderr)
+            sys.exit(2)
+
+        name_a = roleset.get("agent_a", {}).get("name", "Agent A")
+        name_b = roleset.get("agent_b", {}).get("name", "Agent B")
+
+        agent_a = HFChatAgent(name_a, sys_a, tok_a, mdl_a, strategy)
+        agent_b = HFChatAgent(name_b, sys_b, tok_b, mdl_b, strategy)
+
+        # Controller
+        result = run_controller(task_text, agent_a, agent_b, max_rounds=strategy.max_rounds, kind=kind)
+
+    # 3) Persist artifact
+    out_prefix = f"{_now_stamp()}_{args.scenario}"
+    out_path = RUNS / f"{out_prefix}.json"
+    out_path.write_text(_dump_json(result), encoding="utf-8")
+
+    # 4) Console summary
+    final = result.get("canonical_text")
+    if final:
+        print("\n=== FINAL TEXT ===\n" + str(final))
+    else:
+        print("\n(No consensus)")
+
 
 if __name__ == "__main__":
+    # Ensure `src` works as a package when run via `python -m src.main`
+    # If you plan to ever run this file directly, add an empty `src/__init__.py` too.
     main()

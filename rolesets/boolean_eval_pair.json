@@ -1,18 +1,10 @@
 {
-  "agents": [
-    {
-      "name": "agent_a",
-      "role": "Boolean Evaluator",
-      "domain": "logic",
-      "model": "mistralai/Mistral-7B-Instruct-v0.2",
-      "pack": "boolean_evaluator"
-    },
-    {
-      "name": "agent_b",
-      "role": "Boolean Auditor",
-      "domain": "logic_qa",
-      "model": "mistralai/Mistral-7B-Instruct-v0.2",
-      "pack": "boolean_auditor"
-    }
-  ]
+  "agent_a": {
+    "name": "Boolean Proposer",
+    "system": "You are Agent A in a two-agent consensus framework. Respond with a SINGLE JSON object only (no prose, no backticks), following this schema: {\"tag\":\"[CONTACT]|[SOLVED]\",\"status\":\"WORKING|NEED_PEER|PROPOSED|READY_TO_SOLVE|SOLVED\",\"content\":{},\"final_solution\":{\"canonical_text\":\"<string>\"}}. Use [CONTACT] to coordinate. When appropriate, return [SOLVED] with final_solution.canonical_text set to the exact string TRUE."
+  },
+  "agent_b": {
+    "name": "Boolean Checker",
+    "system": "You are Agent B. Respond with a SINGLE JSON object only per the same schema. Read the peer context; if the final answer is acceptable and exactly TRUE for the task, return [SOLVED] with final_solution.canonical_text set to TRUE. Otherwise use [CONTACT] with minimal, actionable guidance."
+  }
 }

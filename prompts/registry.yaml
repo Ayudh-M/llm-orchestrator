@@ -1,32 +1,54 @@
 scenarios:
   cosmic_kids:
-    description: "Explain cosmic rays to kids; return final text only."
-    task_text: |
-      Explain cosmic rays to kids; return final text only.
+    description: Explain cosmic rays to kids; return final text only.
+    task_text: 'Explain cosmic rays to kids; return final text only.
+
+      '
     roleset: rolesets/writer_physicist.json
     strategy: S1
-    schema_hint: |-
-      {"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}
+    schema_hint: '{"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}'
     models:
       a: mistralai/Mistral-7B-Instruct-v0.2
       b: mistralai/Mistral-7B-Instruct-v0.2
     dtype: bfloat16
     max_rounds: 8
-    stop_when: ["SOLVED"]
-
-
+    stop_when:
+    - SOLVED
   mistral_v01_smoketest:
-    description: "Quick sanity using base Mistral-7B-v0.1 on Regex author↔tester."
-    task_text: |
-      Write a regex that matches valid Dutch postal codes like '1234 AB' (four digits, space, two uppercase letters), and only that format.
+    description: "Quick sanity using base Mistral-7B-v0.1 on Regex author\u2194tester."
+    task_text: 'Write a regex that matches valid Dutch postal codes like ''1234 AB''
+      (four digits, space, two uppercase letters), and only that format.
+
       Return ONLY the final regex string via canonical_text, nothing else.
+
+      '
     roleset: rolesets/regex_author_tester.json
     strategy: S1
-    schema_hint: |-
-      {"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}
+    schema_hint: '{"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}'
     models:
       a: mistralai/Mistral-7B-v0.1
       b: mistralai/Mistral-7B-v0.1
     dtype: bfloat16
     max_rounds: 6
-    stop_when: ["SOLVED"]
+    stop_when:
+    - SOLVED
+  tiny_truth:
+    task: Return the exact string TRUE as the final canonical answer.
+    roleset: rolesets/boolean_eval_pair.json
+    strategy: S1
+    kind: json
+    models:
+      a: roneneldan/TinyStories-1M
+      b: roneneldan/TinyStories-1M
+    dtype: fp32
+    mock_solution: 'TRUE'
+  mistral_truth:
+    task: Return the exact string TRUE as the final canonical answer.
+    roleset: rolesets/boolean_eval_pair.json
+    strategy: S1
+    kind: json
+    models:
+      a: mistralai/Mistral-7B-Instruct-v0.1
+      b: mistralai/Mistral-7B-Instruct-v0.1
+    dtype: bf16
+    mock_solution: 'TRUE'

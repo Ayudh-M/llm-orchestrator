@@ -1,5 +1,9 @@
-name: S1
-type: contact
+id: S1
+name: strict_json_minimal
+json_envelope_schema: schemas/envelope.schema.json
 max_rounds: 8
-stop_when:
-  - SOLVED
+allow_cot: false
+decoding:
+  do_sample: false
+  temperature: 0.0
+  max_new_tokens: 256
