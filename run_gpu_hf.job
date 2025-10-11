@@ -1,0 +1,38 @@
+
+#!/bin/bash
+#SBATCH --job-name=consensus-hf
+#SBATCH --partition=gpu_h100          # or gpu_a100
+#SBATCH --nodes=1
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=00:20:00
+#SBATCH --mem=40G
+#SBATCH --output=logs/%x-%j.out
+
+set -euo pipefail
+
+TASK="${1:-Translate the sentence into French: 'Small birds fly swiftly.'}"
+ROLESET="${2:-rolesets/sql_author_auditor.json}"
+STRAT="${3:-S1}"
+MODEL_A="${4:-mistralai/Mistral-7B-Instruct-v0.3}"
+MODEL_B="${5:-mistralai/Mistral-7B-Instruct-v0.3}"
+DTYPE="${6:-bfloat16}"
+
+module purge
+module load 2024
+module load Python/3.12.3-GCCcore-13.3.0
+source ~/.venvs/consensus312/bin/activate
+
+# Caches
+if [ -n "${HF_HOME:-}" ]; then
+  export HF_HOME="$HF_HOME"
+elif [ -n "${SCRATCH:-}" ]; then
+  export HF_HOME="$SCRATCH/hf_cache"
+else
+  export HF_HOME="$HOME/.cache/huggingface"
+fi
+mkdir -p "$HF_HOME" runs logs
+
+# If gated models: export HUGGING_FACE_HUB_TOKEN=<token> beforehand.
+
+srun python -m src.main   --hf   --task "$TASK"   --roleset "$ROLESET"   --strategy "$STRAT"   --agent-a hf   --agent-b hf   --model-a "$MODEL_A"   --model-b "$MODEL_B"   --dtype "$DTYPE"   --max-rounds 8
