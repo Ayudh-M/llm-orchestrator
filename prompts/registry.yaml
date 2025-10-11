@@ -13,3 +13,20 @@ scenarios:
     dtype: bfloat16
     max_rounds: 8
     stop_when: ["SOLVED"]
+
+
+  mistral_v01_smoketest:
+    description: "Quick sanity using base Mistral-7B-v0.1 on Regex author↔tester."
+    task_text: |
+      Write a regex that matches valid Dutch postal codes like '1234 AB' (four digits, space, two uppercase letters), and only that format.
+      Return ONLY the final regex string via canonical_text, nothing else.
+    roleset: rolesets/regex_author_tester.json
+    strategy: S1
+    schema_hint: |-
+      {"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}
+    models:
+      a: mistralai/Mistral-7B-v0.1
+      b: mistralai/Mistral-7B-v0.1
+    dtype: bfloat16
+    max_rounds: 6
+    stop_when: ["SOLVED"]

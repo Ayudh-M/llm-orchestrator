@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=consensus-hf
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gpus=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=18
 #SBATCH --time=01:00:00
-#SBATCH --mem=40G
+#SBATCH --mem=120G
 #SBATCH --output=logs/%x-%j.out
 
 set -euo pipefail
@@ -14,23 +14,34 @@ cd "$SLURM_SUBMIT_DIR"
 SCENARIO="${1:?scenario id required}"
 MODEL_A="${2:-}"
 MODEL_B="${3:-}"
-DTYPE="${4:-}"
+DTYPE="${4:-bfloat16}"
 
-module purge
-module load 2024
-module load Python/3.12.3-GCCcore-13.3.0
+echo "== Snellius job: scenario=$SCENARIO model_a=${MODEL_A:-'(default)'} model_b=${MODEL_B:-'(default)'} dtype=$DTYPE"
 
-if [ -f "$HOME/.venvs/consensus312/bin/activate" ]; then
-  source "$HOME/.venvs/consensus312/bin/activate"
+# Prefer node-local scratch if available; otherwise fallback to shared scratch
+if [ -n "${TMPDIR:-}" ]; then
+  export HF_HOME="$TMPDIR/hf"
+  export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+  export HF_DATASETS_CACHE="$HF_HOME/datasets"
+else
+  export HF_HOME="/scratch-shared/$USER/hf"
+  export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+  export HF_DATASETS_CACHE="$HF_HOME/datasets"
+fi
+mkdir -p "$HF_HOME" "$TRANSFORMERS_CACHE" "$HF_DATASETS_CACHE"
+
+# Python env: use existing venv if present; else create a throwaway venv in scratch
+if [ -f "$HOME/.venvs/consensus/bin/activate" ]; then
+  source "$HOME/.venvs/consensus/bin/activate"
+else
+  VENV_DIR="${TMPDIR:-/scratch-shared/$USER}/venvs/consensus"
+  python3 -m venv "$VENV_DIR"
+  source "$VENV_DIR/bin/activate"
+  python -m pip install --upgrade pip
+  pip install -r requirements.txt
 fi
 
 mkdir -p logs runs
-
-if [ -d "/scratch-shared/$USER" ]; then
-  export HF_HOME="/scratch-shared/$USER/hf-cache"
-  mkdir -p "$HF_HOME"
-fi
-
 export PYTHONPATH="$PWD:$PWD/src:$PYTHONPATH"
 
-python -m src.main   --scenario "$SCENARIO"   ${MODEL_A:+--model-a "$MODEL_A"}   ${MODEL_B:+--model-b "$MODEL_B"}   ${DTYPE:+--dtype "$DTYPE"}
+srun python -m src.main \  --scenario "$SCENARIO" \  ${MODEL_A:+--model-a "$MODEL_A"} \  ${MODEL_B:+--model-b "$MODEL_B"} \  --dtype "$DTYPE"
