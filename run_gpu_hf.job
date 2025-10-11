@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #SBATCH --job-name=consensus-hf
 #SBATCH --partition=gpu_h100          # or gpu_a100
