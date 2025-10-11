@@ -1,10 +1,8 @@
+transformers>=4.57.0
+torch==2.8.0
+PyYAML>=6.0.1
+rich>=13.7.0
+accelerate>=1.0.0
+tokenizers>=0.22.0
 pydantic>=2.5.0
 jsonschema>=4.21.0
-rich>=13.7.0
-PyYAML>=6.0.1
-transformers>=4.57.0
-tokenizers>=0.22.0
-accelerate>=1.0.0
-huggingface-hub>=0.35.0
-torch==2.8.0
-typing-inspection>=0.4.2

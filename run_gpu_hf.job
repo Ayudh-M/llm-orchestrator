@@ -1,22 +1,20 @@
-\
 #!/bin/bash
 #SBATCH --job-name=consensus-hf
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=00:10:00
+#SBATCH --time=01:00:00
 #SBATCH --mem=40G
 #SBATCH --output=logs/%x-%j.out
 
 set -euo pipefail
+cd "$SLURM_SUBMIT_DIR"
 
-TASK="${1:?task text required}"
-ROLESET="${2:?roleset json path required}"
-STRATEGY="${3:-S1}"
-MODEL_A="${4:-mistralai/Mistral-7B-v0.1}"
-MODEL_B="${5:-mistralai/Mistral-7B-v0.1}"
-DTYPE="${6:-bfloat16}"
+SCENARIO="${1:?scenario id required}"
+MODEL_A="${2:-}"
+MODEL_B="${3:-}"
+DTYPE="${4:-}"
 
 module purge
 module load 2024
@@ -26,9 +24,13 @@ if [ -f "$HOME/.venvs/consensus312/bin/activate" ]; then
   source "$HOME/.venvs/consensus312/bin/activate"
 fi
 
+mkdir -p logs runs
+
 if [ -d "/scratch-shared/$USER" ]; then
   export HF_HOME="/scratch-shared/$USER/hf-cache"
   mkdir -p "$HF_HOME"
 fi
 
-python -m src.main "$TASK" "$ROLESET" "$STRATEGY" "$MODEL_A" "$MODEL_B" "$DTYPE"
+export PYTHONPATH="$PWD:$PWD/src:$PYTHONPATH"
+
+python -m src.main   --scenario "$SCENARIO"   ${MODEL_A:+--model-a "$MODEL_A"}   ${MODEL_B:+--model-b "$MODEL_B"}   ${DTYPE:+--dtype "$DTYPE"}

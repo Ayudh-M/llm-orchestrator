@@ -1,0 +1,15 @@
+scenarios:
+  cosmic_kids:
+    description: "Explain cosmic rays to kids; return final text only."
+    task_text: |
+      Explain cosmic rays to kids; return final text only.
+    roleset: rolesets/writer_physicist.json
+    strategy: S1
+    schema_hint: |-
+      {"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}
+    models:
+      a: mistralai/Mistral-7B-Instruct-v0.2
+      b: mistralai/Mistral-7B-Instruct-v0.2
+    dtype: bfloat16
+    max_rounds: 8
+    stop_when: ["SOLVED"]

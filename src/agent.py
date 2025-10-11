@@ -1,101 +1,118 @@
-\
-import json, hashlib, re
-from typing import Dict, Any, Optional
-from transformers import AutoTokenizer, AutoModelForCausalLM
+
+from __future__ import annotations
+import json, re
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+
 import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-class HFChatAgent:
-    def __init__(self, model_name: str, dtype_str: str = "bfloat16"):
-        self.model_name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=False)
-        _dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16}.get(dtype_str, None)
-        # Use `dtype` (preferred in newer Transformers)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="auto",
-            dtype=_dtype,
-            trust_remote_code=False,
-        )
-        if self.tokenizer.pad_token_id is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+DTYPE_MAP = {
+    "bfloat16": torch.bfloat16,
+    "float16": torch.float16,
+    "fp16": torch.float16,
+    "float32": torch.float32,
+    "fp32": torch.float32,
+}
 
-    def build_prompt(self, task_text: str, peer_context: Dict[str, Any], schema_hint: str) -> str:
-        system = (
-            "You are an agent in a 2-agent orchestrator.\n"
-            "Return ONLY one compact JSON object with keys exactly: "
-            '{"tag": "...", "status": "...", "content": {...}, '
-            '"final_solution": {"canonical_text": "...", "sha256": null}}\n'
-            "No prose, no code fences, no extra keys. " + schema_hint
-        )
-        user = (
-            f"Task: {task_text}\n"
-            f"Peer context: {json.dumps(peer_context, ensure_ascii=False)}\n"
-            "Return ONLY the JSON object per schema."
-        )
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
-        prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        return prompt
-
-    def generate_once(self, prompt: str, max_new_tokens: int = 256) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        out = self.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            temperature=0.0,
-            top_p=1.0,
-            eos_token_id=self.tokenizer.eos_token_id,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
-        return self.tokenizer.decode(out[0], skip_special_tokens=True)
-
-    @staticmethod
-    def extract_first_json(s: str) -> Optional[Dict[str, Any]]:
-        start = s.find("{")
-        if start == -1:
+def _safe_json_extract(text: str):
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    m = re.search(r"\{(?:[^{}]|\{[^{}]*\})*\}", text, re.DOTALL)
+    if m:
+        frag = m.group(0)
+        try:
+            return json.loads(frag)
+        except Exception:
             return None
-        depth = 0
-        for i in range(start, len(s)):
-            if s[i] == "{":
-                depth += 1
-            elif s[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    chunk = s[start:i+1]
-                    try:
-                        return json.loads(chunk)
-                    except Exception:
-                        break
-        import re
-        for m in re.finditer(r"\{.*\}", s, flags=re.DOTALL):
-            try:
-                return json.loads(m.group(0))
-            except Exception:
-                continue
-        return None
+    return None
 
-    @staticmethod
-    def canonicalize(obj: Dict[str, Any]) -> Dict[str, Any]:
-        obj.setdefault("tag", "[CONTACT]")
-        obj.setdefault("status", "WORKING")
-        obj.setdefault("content", {})
-        obj.setdefault("final_solution", {"canonical_text": None, "sha256": None})
-        if "canonical_text" not in obj["final_solution"]:
-            obj["final_solution"]["canonical_text"] = None
-        if "sha256" not in obj["final_solution"]:
-            obj["final_solution"]["sha256"] = None
-        ct = obj["final_solution"].get("canonical_text")
-        if isinstance(ct, str) and (obj["final_solution"].get("sha256") in (None, "", "null")):
-            obj["final_solution"]["sha256"] = hashlib.sha256(ct.encode("utf-8")).hexdigest()
-        return obj
+@dataclass
+class HFChatAgent:
+    system_prompt: str
+    model_id: str
+    dtype: str = "bfloat16"
+    max_tokens: int = 768
+    temperature: float = 0.7
+    top_p: float = 0.95
 
-    def step(self, task_text: str, peer_context: Dict[str, Any], schema_hint: str) -> Dict[str, Any]:
-        prompt = self.build_prompt(task_text, peer_context, schema_hint)
-        raw = self.generate_once(prompt)
-        parsed = self.extract_first_json(raw)
-        if not parsed:
-            return {"tag": "[CONTACT]", "status": "WORKING", "content": {"note": "fallback"}, "final_solution": {"canonical_text": None, "sha256": None}}
-        return self.canonicalize(parsed)
+    def __post_init__(self):
+        torch_dtype = DTYPE_MAP.get(self.dtype.lower(), torch.bfloat16)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, use_fast=True)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_id,
+            torch_dtype=torch_dtype,
+            device_map="auto"
+        )
+
+    def build_prompt(self, messages: List[Dict[str, str]]) -> str:
+        try:
+            return self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        except Exception:
+            # Fallback for models without chat_template
+            parts = []
+            for m in messages:
+                role = m.get("role", "user")
+                content = (m.get("content") or "").strip()
+                if role == "system":
+                    parts.append(content)
+                elif role == "user":
+                    parts.append(f"User: {content}")
+                elif role == "assistant":
+                    parts.append(f"Assistant: {content}")
+            parts.append("Assistant:")
+            return "\n".join(parts)
+
+    def generate(self, prompt: str) -> str:
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            out = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_tokens,
+                do_sample=True,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id
+            )
+        text = self.tokenizer.decode(out[0], skip_special_tokens=True)
+        if prompt in text:
+            text = text[len(prompt):]
+        return text.strip()
+
+    def step(self, task_text: str, peer_context: Dict[str, Any], schema_hint: Optional[str]) -> Dict[str, Any]:
+        schema_guard = schema_hint or '{"tag":"[CONTACT]","status":"WORKING","content":{"note":"fallback"}}'
+
+        sys_msg = self.system_prompt.strip()
+        user_msg = f"""
+Task: {task_text}
+
+You are collaborating with a peer agent. Peer context (for your awareness):
+{json.dumps(peer_context, ensure_ascii=False)}
+
+Respond with ONLY one JSON object that roughly follows:
+{schema_guard}
+
+If you have a final answer, include:
+"final_solution": {{"canonical_text": "<your final text here>"}},
+and set "status": "SOLVED".
+No markdown, no extra text beyond the single JSON object.
+""".strip()
+
+        messages = [
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": user_msg},
+        ]
+        prompt = self.build_prompt(messages)
+        raw = self.generate(prompt)
+
+        env = _safe_json_extract(raw) or {
+            "tag": "[CONTACT]",
+            "status": "WORKING",
+            "content": {"text": raw[:2000]}
+        }
+        return env

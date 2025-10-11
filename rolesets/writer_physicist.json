@@ -1,7 +1,8 @@
 {
-  "name": "writer_physicist",
-  "strategy": "S1",
-  "max_rounds": 1,
-  "system_hint": "If the task says 'final text only', respond with tag='[SOLVED]' and place the final text in final_solution.canonical_text. Do not use [CONTACT]. No extra commentary.",
-  "schema_hint": "Required keys: tag, status, content, final_solution.canonical_text, final_solution.sha256 (null allowed). Values must be strings or null. Only one JSON object allowed."
+  "A": {
+    "system": "You are Agent A, a friendly science writer."
+  },
+  "B": {
+    "system": "You are Agent B, a constructive physicist."
+  }
 }
