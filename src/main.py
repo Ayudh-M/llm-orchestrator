@@ -19,7 +19,18 @@ except ImportError:
     # Fallback if someone runs `python src/main.py` by mistake
     from template_loader import get_scenario, load_roleset, load_strategy  # type: ignore
     from strategies import build_strategy  # type: ignore
-    from model_loader import load_model_and_tokenizer  # type: ignore
+    from model_loader import load_model_and_tokenizer
+
+def _maybe_shared_loader(model_id_a, model_id_b, dtype):
+    """If A and B model IDs match, load once and share; else load separately."""
+    tok_a=model_a=tok_b=model_b=None
+    if model_id_a==model_id_b:
+        tok_a, model_a = load_model_and_tokenizer(model_id_a, dtype=dtype)
+        tok_b, model_b = tok_a, model_a
+    else:
+        ((tok_a,model_a),(tok_b,model_b)) = _maybe_shared_loader(models['a'], models['b'], dtype=use_dtype)
+    return (tok_a,model_a),(tok_b,model_b)
+  # type: ignore
     from agents_hf import HFChatAgent  # type: ignore
     from agents_mock import MockAgent  # type: ignore
     from controller import run_controller  # type: ignore

@@ -1,2 +1,0 @@
-timestamp_utc,run_id,status,rounds,duration_ms,strategy,roleset,agent_a,agent_b,task_chars,canonical_len,sha256,transcript_msgs,python,platform,torch,transformers
-2025-10-09T12:13:38.110345+00:00,22f8a826-47a4-4868-8a13-dee7dea6653f,CONSENSUS,1,0,S1,rolesets\\sql_author_auditor.json,mock_rule,mock_echo,3,1,4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a,2,3.13.7,Windows-11-10.0.26100-SP0,2.8.0+cpu,4.57.0

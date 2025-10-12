@@ -1,0 +1,9 @@
+id: S1_quick
+name: strict_json_quick
+json_envelope_schema: schemas/envelope.schema.json
+max_rounds: 1
+allow_cot: false
+decoding:
+  do_sample: false
+  temperature: 0.0
+  max_new_tokens: 16
