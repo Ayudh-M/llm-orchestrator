@@ -1,43 +1,23 @@
 #!/bin/bash
-#SBATCH --job-name=consensus-hf
-#SBATCH --partition=gpu
+#SBATCH -J consensus_mistral
+#SBATCH -o logs/%x-%j.out
+#SBATCH -A tesr108469
+#SBATCH -p gpu_mig
 #SBATCH --gpus=1
-#SBATCH --cpus-per-task=18
-#SBATCH --time=01:00:00
-#SBATCH --mem=120G
-#SBATCH --output=logs/%x-%j.out
-
-set -euo pipefail
-cd "$SLURM_SUBMIT_DIR"
-mkdir -p logs runs
-
-SCENARIO="${1:?usage: sbatch run_gpu_hf.job <scenario_id> [model_a] [model_b] [dtype]}"
-MODEL_A="${2:-}"
-MODEL_B="${3:-}"
-DTYPE="${4:-bfloat16}"
+#SBATCH --cpus-per-task=9
+#SBATCH --mem=60G
+#SBATCH -t 00:20:00
 
 module purge
 module load 2024
 module load Python/3.12.3-GCCcore-13.3.0
 
-if [ -f "$HOME/.venvs/consensus312/bin/activate" ]; then
-  source "$HOME/.venvs/consensus312/bin/activate"
-else
-  python3 -m venv "$HOME/.venvs/consensus312"
-  source "$HOME/.venvs/consensus312/bin/activate"
-  python -m pip install -U pip
-  pip install -r requirements.txt
-fi
+source ~/.venvs/consensus312/bin/activate
 
-export HF_HOME="${TMPDIR:-/scratch-shared/$USER}/hf"
-export TRANSFORMERS_CACHE="$HF_HOME/transformers"
-export HF_DATASETS_CACHE="$HF_HOME/datasets"
+export HF_HOME=/scratch-shared/$USER/hf
+export TRANSFORMERS_CACHE=$HF_HOME/transformers
+export HF_DATASETS_CACHE=$HF_HOME/datasets
+mkdir -p "$HF_HOME" logs runs
 
-export PYTHONPATH="$PWD:$PWD/src:${PYTHONPATH:-}"
-
-ARGS=( -m src.main --scenario "$SCENARIO" --dtype "$DTYPE" )
-[ -n "$MODEL_A" ] && ARGS+=( --model-a "$MODEL_A" )
-[ -n "$MODEL_B" ] && ARGS+=( --model-b "$MODEL_B" )
-
-echo "Running: python ${ARGS[*]}"
-srun python "${ARGS[@]}"
+echo "Scenario: ${1:-mistral_truth}"
+srun python -m src.main --scenario "${1:-mistral_truth}" --dtype bfloat16
