@@ -1,0 +1,68 @@
+{
+  "status": "CONSENSUS",
+  "canonical_text": "4",
+  "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+  "rounds": 1,
+  "transcript": [
+    {
+      "t": 1,
+      "actor": "A",
+      "envelope": {
+        "role": null,
+        "domain": null,
+        "tag": "[SOLVED]",
+        "status": "SOLVED",
+        "content": {
+          "note": "mock"
+        },
+        "final_solution": {
+          "canonical_text": "4",
+          "sha256": null
+        },
+        "artifact": null
+      },
+      "raw": "{'status': 'SOLVED', 'tag': '[SOLVED]', 'content': {'note': 'mock'}, 'final_solution': {'canonical_text': '4'}}"
+    },
+    {
+      "t": 1,
+      "actor": "B",
+      "envelope": {
+        "role": null,
+        "domain": null,
+        "tag": "[SOLVED]",
+        "status": "SOLVED",
+        "content": {
+          "note": "echo"
+        },
+        "final_solution": {
+          "canonical_text": "4",
+          "sha256": null
+        },
+        "artifact": null
+      },
+      "raw": "{'status': 'SOLVED', 'tag': '[SOLVED]', 'content': {'note': 'echo'}, 'final_solution': {'canonical_text': '4'}}"
+    }
+  ],
+  "final_a": {
+    "status": "SOLVED",
+    "tag": "[SOLVED]",
+    "content": {
+      "note": "mock"
+    },
+    "final_solution": {
+      "canonical_text": "4",
+      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    }
+  },
+  "final_b": {
+    "status": "SOLVED",
+    "tag": "[SOLVED]",
+    "content": {
+      "note": "echo"
+    },
+    "final_solution": {
+      "canonical_text": "4",
+      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    }
+  }
+}
