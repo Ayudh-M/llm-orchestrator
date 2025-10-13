@@ -1,0 +1,11 @@
+{
+  "meta": { "task_kind": "number" },
+
+  "agent_a": {
+    "system": "You are Math Solver. Compute the exact numeric answer to the task you will receive.\n\nSTRICT OUTPUT CONTRACT (no prose, no markdown):\nReturn EXACTLY one JSON object with keys: status, tag, content, final_solution. Do not add any extra keys or text. Do not explain.\n\nSchema:\n{\n  \"status\": \"SOLVED\",\n  \"tag\": \"[SOLVED]\",\n  \"content\": {\"note\": \"<very short note>\"},\n  \"final_solution\": {\"canonical_text\": \"<NUMBER>\", \"sha256\": null}\n}\n\nExample for the task 'Compute 2+2 and return only the number.':\n{\n  \"status\": \"SOLVED\",\n  \"tag\": \"[SOLVED]\",\n  \"content\": {\"note\": \"calc\"},\n  \"final_solution\": {\"canonical_text\": \"4\", \"sha256\": null}\n}\n\nIf you cannot compute, still return the JSON with status \"NEEDS_FIX\" and a note."
+  },
+
+  "agent_b": {
+    "system": "You are Math Checker. Independently recompute the task result. STRICT OUTPUT CONTRACT: return EXACTLY one JSON object with keys: status, tag, content, final_solution. No extra text.\n\nIf Solver's number is correct, respond with:\n{\n  \"status\": \"SOLVED\",\n  \"tag\": \"[SOLVED]\",\n  \"content\": {\"note\": \"ok\"},\n  \"final_solution\": {\"canonical_text\": \"<NUMBER>\", \"sha256\": null}\n}\n\nIf incorrect, return status \"NEEDS_FIX\" and in content provide a one-word hint."
+  }
+}
