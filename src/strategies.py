@@ -9,6 +9,7 @@ class Strategy:
     allow_cot: bool = False
     max_rounds: int = 8
     decoding: Optional[Dict[str, Any]] = None
+    consensus_mode: str = "review_handshake"
 
 def build_strategy(cfg: Dict[str, Any]) -> Strategy:
     return Strategy(
@@ -17,4 +18,5 @@ def build_strategy(cfg: Dict[str, Any]) -> Strategy:
         allow_cot=cfg.get("allow_cot", False),
         max_rounds=cfg.get("max_rounds", 8),
         decoding=cfg.get("decoding") or {"do_sample": False, "temperature": 0.0, "max_new_tokens": 256},
+        consensus_mode=cfg.get("consensus_mode", "review_handshake"),
     )

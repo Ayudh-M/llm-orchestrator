@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, Any
 
 ALLOWED_TAGS = {"[CONTACT]", "[SOLVED]"}
-ALLOWED_STATUS = {"WORKING", "NEED_PEER", "PROPOSED", "READY_TO_SOLVE", "SOLVED"}
+ALLOWED_STATUS = {"WORKING", "NEED_PEER", "PROPOSED", "READY_TO_SOLVE", "REVISED", "SOLVED"}
 
 def repair_envelope(env: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -24,7 +24,5 @@ def repair_envelope(env: Dict[str, Any]) -> Dict[str, Any]:
         e["status"] = "SOLVED" if e["tag"] == "[SOLVED]" else "PROPOSED"
 
     # Enforce final_solution presence/absence
-    if e["tag"] != "[SOLVED]":
-        e.pop("final_solution", None)
 
     return e
