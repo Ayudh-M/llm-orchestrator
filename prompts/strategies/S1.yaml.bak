@@ -1,7 +1,7 @@
 id: S1
 name: strict_json
 json_only: true
-json_envelope_schema: schemas/envelope.number.schema.json
+json_envelope_schema: schemas/envelope.schema.json
 allow_cot: false
 decoding:
   do_sample: false
