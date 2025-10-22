@@ -3,8 +3,17 @@ import yaml, json
 from pathlib import Path
 from typing import Any, Dict
 
+from .strategies import StrategyDefinition, get_strategy_definition
+
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "prompts" / "registry.yaml"
+
+
+def _scenario_lookup_id(scenario_id: str) -> str:
+    parts = str(scenario_id).split(":")
+    if parts and parts[-1].startswith("rep="):
+        parts = parts[:-1]
+    return ":".join(parts)
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
@@ -19,11 +28,11 @@ def load_registry() -> Dict[str, Any]:
         raise ValueError("Registry must contain a 'scenarios' mapping.")
     return data
 
-def load_strategy(name: str) -> Dict[str, Any]:
-    path = ROOT / "prompts" / "strategies" / f"{name}.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"Strategy file not found: {path}")
-    return _load_yaml(path)
+def load_strategy(name: str) -> StrategyDefinition:
+    try:
+        return get_strategy_definition(name)
+    except KeyError as exc:
+        raise KeyError(f"Strategy id not found in registry: {name}") from exc
 
 def load_roleset(path_str: str) -> Dict[str, Any]:
     path = (ROOT / path_str).resolve()
@@ -36,7 +45,10 @@ def load_roleset(path_str: str) -> Dict[str, Any]:
 
 def get_scenario(scenario_id: str) -> Dict[str, Any]:
     reg = load_registry()
-    try:
-        return reg["scenarios"][scenario_id]
-    except KeyError:
-        raise KeyError(f"Scenario id not found in registry: {scenario_id}")
+    scenarios = reg["scenarios"]
+    lookup_id = _scenario_lookup_id(scenario_id)
+    if scenario_id in scenarios:
+        return scenarios[scenario_id]
+    if lookup_id in scenarios:
+        return scenarios[lookup_id]
+    raise KeyError(f"Scenario id not found in registry: {lookup_id}")
